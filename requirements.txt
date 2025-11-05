@@ -3,3 +3,4 @@ streamlit
 gtts
 requests
 python-dotenv
+streamlit-lottie
