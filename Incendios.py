@@ -48,7 +48,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='title'>🔥 Sistema IoT — Detección de Humo (ESP32 + MQ-7)</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Interfaz en tiempo real — solo estado de humo. Actualización automática.</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Interfaz en tiempo real — estado actual del sensor de humo</div>", unsafe_allow_html=True)
 st.divider()
 
 # =======================
@@ -74,16 +74,11 @@ st.divider()
 # =======================
 if "alert_active" not in st.session_state:
     st.session_state.alert_active = False
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
 if "alert_resolved" not in st.session_state:
     st.session_state.alert_resolved = False
-if "alert_auto_triggered" not in st.session_state:
-    st.session_state.alert_auto_triggered = False
 
 # Configuración lateral
 refresh_rate = st.sidebar.slider("Intervalo de actualización (s)", 2, 10, 5)
-confirm_seconds = st.sidebar.number_input("Segundos para confirmación automática", 5, 120, 30)
 
 # =======================
 # FUNCIONES AUXILIARES
@@ -109,34 +104,22 @@ def cancelar_alerta():
     st.session_state.alert_active = False
     st.success("✅ Alerta cancelada.")
 
-def activar_alerta_automatica():
-    st.session_state.alert_resolved = True
-    st.session_state.alert_active = False
-    st.warning("⚠️ Alerta automática activada (visual).")
-
 # =======================
-# ACTUALIZACIÓN AUTOMÁTICA
+# ACTUALIZACIÓN DE DATOS
 # =======================
-# Reemplazamos la función experimental por la estable
-st_autorefresh = st.rerun
-
 data = obtener_ultimo_estado()
 if data is None:
     st.markdown("<div class='status-box'>Esperando lecturas del sensor...</div>", unsafe_allow_html=True)
-    st.rerun()
+    st.stop()
 
 # =======================
 # LÓGICA PRINCIPAL
 # =======================
 humo = int(data.get("humo_detectado", 0))
-now = time.time()
 
-# Detección de humo
 if humo == 1 and not st.session_state.alert_active:
     st.session_state.alert_active = True
-    st.session_state.start_time = now
     st.session_state.alert_resolved = False
-    st.session_state.alert_auto_triggered = False
 
 if humo == 0:
     st.markdown("<div class='ok-box'>✅ Aire limpio y seguro</div>", unsafe_allow_html=True)
@@ -147,17 +130,11 @@ if humo == 0:
 
 # Mostrar alerta activa
 if st.session_state.alert_active and not st.session_state.alert_resolved:
-    elapsed = int(now - st.session_state.start_time)
-    remaining = confirm_seconds - elapsed
-    if remaining <= 0:
-        activar_alerta_automatica()
-        st.rerun()
-
-    st.markdown(f"""
+    st.markdown("""
         <div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>
             🚨 <span style='color:#ff4b4b;'>HUMO DETECTADO</span><br>
             <div style='font-size:16px; color:#ffd6d6; margin-top:8px;'>
-                Si no cancelas, se activará la alerta automática en <strong>{remaining}s</strong>
+                Se ha detectado presencia de humo en el ambiente.
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -172,12 +149,8 @@ if st.session_state.alert_active and not st.session_state.alert_resolved:
             cancelar_alerta()
             st.rerun()
 
-# Mostrar resultado de alerta resuelta
 elif st.session_state.alert_resolved:
-    if st.session_state.alert_auto_triggered:
-        st.markdown("<div class='status-box' style='color:#ffd27f;'>⚠️ Alerta automática activada</div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='status-box' style='color:#7fffbf;'>ℹ️ Alerta resuelta manualmente</div>", unsafe_allow_html=True)
+    st.markdown("<div class='status-box' style='color:#7fffbf;'>ℹ️ Alerta resuelta manualmente</div>", unsafe_allow_html=True)
     time.sleep(refresh_rate)
     st.session_state.alert_resolved = False
     st.rerun()
