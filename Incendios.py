@@ -41,7 +41,7 @@ st.markdown("---")
 
 # ----------------- LECTURA DE DATOS -----------------
 try:
-    response = requests.get("http://172.20.244.145:5000/lecturas")  # Cambia por la IP real de tu ESP32 / servidor Flask
+    response = requests.get("http://10.16.20.252:5000")  # Cambia por la IP real de tu ESP32 / servidor Flask
     data = response.json()
     df = pd.DataFrame(data)
 
