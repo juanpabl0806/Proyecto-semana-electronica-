@@ -1,21 +1,19 @@
 import streamlit as st
 import requests
-import pandas as pd
 import time
 from streamlit_lottie import st_lottie
 
 # ==============================
-# 🔥 CONFIGURACIÓN INICIAL
+# ⚙️ CONFIGURACIÓN DE PÁGINA
 # ==============================
 st.set_page_config(
-    page_title="Sistema de Alerta IoT",
+    page_title="Sistema IoT Alerta de Gas",
     page_icon="🔥",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
 # ==============================
-# 🎨 FUNCIÓN PARA CARGAR LOTTIE
+# 🎨 CARGAR ANIMACIÓN LOTTIE
 # ==============================
 def load_lottieurl(url: str):
     try:
@@ -27,10 +25,9 @@ def load_lottieurl(url: str):
         return None
 
 # ==============================
-# 🌈 ENCABEZADO Y DISEÑO
+# 🖥️ INTERFAZ PRINCIPAL
 # ==============================
-col1, col2 = st.columns([1, 2])
-
+col1, col2 = st.columns([1, 3])
 with col1:
     lottie = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_tfb3estd.json")
     if lottie:
@@ -39,8 +36,8 @@ with col1:
 with col2:
     st.markdown(
         """
-        <h1 style='font-size: 42px; color: #ff4b4b;'>Sistema de Alerta Temprana IoT 🔥</h1>
-        <p style='font-size: 18px; color: #555;'>Monitoreo en tiempo real de gases inflamables con ESP32 y servidor Flask en Render</p>
+        <h1 style='font-size: 42px; color: #ff4b4b;'>Alerta de Gas IoT 🔥</h1>
+        <p style='font-size: 18px; color: #555;'>Monitoreo en tiempo real desde tu ESP32 conectado al servidor Flask en Render</p>
         """,
         unsafe_allow_html=True
     )
@@ -48,65 +45,63 @@ with col2:
 st.divider()
 
 # ==============================
-# 🌍 CONFIGURACIÓN DEL SERVIDOR
+# 🌍 CONFIGURAR SERVIDOR
 # ==============================
 URL_BASE = "https://serverfire-1.onrender.com/"
 
-st.subheader("📡 Estado de conexión con el servidor")
-
-try:
-    resp = requests.get(f"{URL_BASE}/lecturas", timeout=5)
-    if resp.status_code == 200:
-        st.success("✅ Conectado correctamente con el servidor Render")
-    else:
-        st.warning("⚠️ Servidor accesible, pero no devolvió datos válidos")
-except Exception as e:
-    st.error(f"❌ Error al conectar con el servidor: {e}")
-
-st.divider()
+st.subheader("📡 Estado del sistema")
 
 # ==============================
-# 📊 MONITOREO EN TIEMPO REAL
+# 🔁 MONITOREO SIN HISTORIAL
 # ==============================
-st.subheader("📈 Monitoreo en tiempo real de lecturas del sensor de gas")
-
 placeholder = st.empty()
+refresh_rate = st.slider("⏱️ Intervalo de actualización (segundos)", 2, 10, 4)
 
-refresh_rate = st.slider("⏱️ Intervalo de actualización (segundos)", 2, 20, 5)
+st.info("El sistema muestra el último valor detectado y lo limpia automáticamente.")
 
-st.info("El sistema actualizará los datos automáticamente según el intervalo seleccionado.")
-
-# Bucle de actualización en tiempo real
 while True:
     try:
         resp = requests.get(f"{URL_BASE}/lecturas", timeout=5)
         if resp.status_code == 200:
             lecturas = resp.json()
-            
+
+            # Si hay datos, toma el último valor
             if isinstance(lecturas, list) and len(lecturas) > 0:
-                df = pd.DataFrame(lecturas)
-                
-                # Normalizar nombres de columnas esperadas
-                if "gas" in df.columns:
-                    df = df.rename(columns={"gas": "Nivel de Gas (ppm)"})
-                if "tiempo" in df.columns:
-                    df = df.rename(columns={"tiempo": "Tiempo"})
-                
+                ultima = lecturas[-1]
+                gas = ultima.get("gas", None)
+
                 with placeholder.container():
-                    st.line_chart(df.set_index(df.columns[0]))
-                    ultima = df.iloc[-1]
-                    st.metric(label="Último nivel detectado (ppm)", value=ultima.iloc[1])
-                    
-                    if ultima.iloc[1] > 400:
-                        st.error("🚨 Nivel peligroso de gas detectado. Activar protocolo de seguridad.")
+                    if gas is not None:
+                        st.markdown(
+                            f"""
+                            <div style="text-align:center; padding: 30px; border-radius: 20px;
+                            background-color: {'#ffcccc' if gas > 400 else '#ccffcc'}; 
+                            box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                                <h2 style="color: {'#b30000' if gas > 400 else '#006600'};">
+                                    Nivel de gas detectado: <strong>{gas} ppm</strong>
+                                </h2>
+                                <p>{'⚠️ Nivel peligroso de gas. ¡Activa el protocolo de seguridad!' if gas > 400 else '✅ Nivel seguro.'}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
                     else:
-                        st.success("✅ Nivel seguro de gas detectado.")
+                        st.warning("⚠️ No se encontró dato 'gas' en la lectura.")
+
+                # Esperar antes de borrar el valor
+                time.sleep(refresh_rate)
+
+                # Limpiar el valor (desaparece)
+                placeholder.empty()
+
             else:
-                st.warning("⚠️ No hay lecturas disponibles aún.")
+                with placeholder.container():
+                    st.warning("Esperando lecturas desde el sensor...")
+
         else:
             st.error("❌ No se pudo obtener datos del servidor.")
     except Exception as e:
-        st.error(f"Error al obtener lecturas: {e}")
+        st.error(f"Error al conectar con el servidor: {e}")
     
     time.sleep(refresh_rate)
 
