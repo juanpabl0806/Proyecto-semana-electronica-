@@ -7,7 +7,7 @@ from streamlit_lottie import st_lottie
 # ⚙️ CONFIGURACIÓN DE PÁGINA
 # ==============================
 st.set_page_config(
-    page_title="Sistema IoT Alerta de Gas",
+    page_title="Alerta de Gas IoT",
     page_icon="🔥",
     layout="centered"
 )
@@ -36,13 +36,13 @@ st.markdown(
         box-shadow: 0 0 20px rgba(255, 75, 75, 0.3);
         margin-bottom: 20px;
     }
-    .gas-box {
-        border-radius: 20px;
-        padding: 30px;
+    .alerta-box {
+        border-radius: 25px;
+        padding: 40px;
         text-align: center;
+        font-size: 26px;
         font-weight: bold;
-        font-size: 22px;
-        box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 30px rgba(255,255,255,0.15);
         transition: all 0.3s ease;
     }
     </style>
@@ -51,7 +51,7 @@ st.markdown(
 )
 
 # ==============================
-# 🎨 CARGAR ANIMACIÓN LOTTIE
+# 🎨 ANIMACIÓN LOTTIE
 # ==============================
 def load_lottieurl(url: str):
     try:
@@ -74,8 +74,8 @@ with col1:
 with col2:
     st.markdown(
         """
-        <h1 style='font-size: 42px; color: #ff4b4b;'>Alerta de Gas IoT 🔥</h1>
-        <p style='font-size: 18px; color: #bdbdbd;'>Monitoreo en tiempo real con ESP32 y servidor Flask en Render</p>
+        <h1 style='font-size: 42px; color: #ff4b4b;'>Sistema IoT de Alerta de Gas 🔥</h1>
+        <p style='font-size: 18px; color: #bdbdbd;'>Monitoreo en tiempo real desde tu ESP32 y servidor Flask en Render</p>
         """,
         unsafe_allow_html=True
     )
@@ -83,7 +83,7 @@ with col2:
 st.divider()
 
 # ==============================
-# 🌍 CONFIGURAR SERVIDOR
+# 🌍 CONFIGURACIÓN DEL SERVIDOR
 # ==============================
 URL_BASE = "https://serverfire-1.onrender.com"
 
@@ -100,7 +100,7 @@ try:
         )
     else:
         status_box.markdown(
-            "<div class='status-box' style='color:#ffcc00;'>⚠️ Servidor accesible, pero no devolvió datos válidos</div>",
+            "<div class='status-box' style='color:#ffcc00;'>⚠️ Servidor accesible, pero sin datos válidos</div>",
             unsafe_allow_html=True
         )
 except Exception as e:
@@ -112,13 +112,14 @@ except Exception as e:
 st.divider()
 
 # ==============================
-# 📊 MONITOREO EN TIEMPO REAL
+# 🚨 MONITOREO DE GAS
 # ==============================
-st.subheader("📈 Lectura Actual del Sensor de Gas")
+st.subheader("🚨 Estado del sensor de gas")
 
 placeholder = st.empty()
 refresh_rate = st.slider("⏱️ Intervalo de actualización (segundos)", 2, 10, 4)
 
+st.info("El sistema actualiza el estado automáticamente y borra la lectura anterior.")
 
 # ==============================
 # 🔁 BUCLE PRINCIPAL
@@ -129,46 +130,48 @@ while True:
         if resp.status_code == 200:
             lecturas = resp.json()
 
-            # Si hay datos, tomar el último
             if isinstance(lecturas, list) and len(lecturas) > 0:
                 ultima = lecturas[-1]
                 gas = ultima.get("gas", None)
 
                 with placeholder.container():
                     if gas is not None:
-                        color = "#ff4b4b" if gas > 400 else "#00ff88"
-                        mensaje = (
-                            "⚠️ Nivel peligroso de gas. ¡Activa el protocolo de seguridad!"
-                            if gas > 400
-                            else "✅ Nivel seguro de gas detectado."
-                        )
-
-                        st.markdown(
-                            f"""
-                            <div class='gas-box' style='background-color: rgba(255,255,255,0.05); border: 2px solid {color}; box-shadow: 0 0 20px {color};'>
-                                <h2 style='color:{color};'>Nivel de gas detectado: <strong>{gas} ppm</strong></h2>
-                                <p style='color:#ccc;'>{mensaje}</p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                        if gas > 400:
+                            # 🚨 Gas detectado
+                            st.markdown(
+                                """
+                                <div class='alerta-box' style='background-color:#400000; border:2px solid #ff4b4b; box-shadow:0 0 25px #ff4b4b;'>
+                                    🚨 <span style='color:#ff4b4b;'>GAS DETECTADO</span> 🚨<br>
+                                    <p style='font-size:20px; color:#ffb3b3;'>¡Atención! Se ha detectado presencia de gas.</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            # ✅ Todo en orden
+                            st.markdown(
+                                """
+                                <div class='alerta-box' style='background-color:#003300; border:2px solid #00ff88; box-shadow:0 0 25px #00ff88;'>
+                                    ✅ <span style='color:#00ff88;'>TODO EN ORDEN</span><br>
+                                    <p style='font-size:20px; color:#b3ffcc;'>No se detecta presencia de gas.</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
                     else:
-                        st.warning("⚠️ No se encontró el valor 'gas' en la lectura.")
+                        st.warning("⚠️ No se encontró valor 'gas' en la lectura.")
 
-                # Mantener el valor visible por unos segundos
+                # Mantener visible unos segundos
                 time.sleep(refresh_rate)
-
-                # Limpiar para que desaparezca
+                # Limpiar el mensaje
                 placeholder.empty()
 
             else:
                 with placeholder.container():
-                    st.warning("Esperando lecturas desde el sensor...")
-
+                    st.warning("Esperando lecturas del sensor...")
         else:
             st.error("❌ No se pudo obtener datos del servidor.")
     except Exception as e:
         st.error(f"Error al conectar con el servidor: {e}")
 
     time.sleep(refresh_rate)
-
