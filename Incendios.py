@@ -2,54 +2,91 @@ import streamlit as st
 import requests
 import time
 import os
-from twilio.rest import Client  # 👈 Importar Twilio
+from twilio.rest import Client
 
 # =======================
 # CONFIGURACIÓN DE PÁGINA
 # =======================
-st.set_page_config(page_title="Alerta de Humo IoT", page_icon="🔥", layout="centered")
+st.set_page_config(
+    page_title="🔥 Detector de Humo IoT",
+    page_icon="🔥",
+    layout="centered"
+)
 
 # =======================
-# ESTILO OSCURO PERSONALIZADO
+# ESTILO OSCURO PERSONALIZADO Y EFECTOS
 # =======================
 st.markdown("""
     <style>
     body {
-        background: linear-gradient(135deg, #0e1117, #16202b);
-        color: #f6f7f9;
+        background: radial-gradient(circle at top left, #1a1a1a, #0d0d0d);
+        color: #e6e6e6;
+        font-family: 'Segoe UI', sans-serif;
     }
     .stApp { background-color: transparent; }
-    .title { font-size:40px; color:#ff5b5b; font-weight:700; text-align:center; }
-    .subtitle { font-size:14px; color:#b9c0c7; text-align:center; margin-bottom:18px; }
+    .title {
+        font-size:46px; 
+        color:#ff5b5b; 
+        font-weight:800; 
+        text-align:center; 
+        text-shadow: 0px 0px 20px rgba(255, 90, 90, 0.6);
+        margin-bottom:10px;
+    }
+    .subtitle {
+        font-size:17px; 
+        color:#b9c0c7; 
+        text-align:center; 
+        margin-bottom:25px;
+    }
     .status-box {
-        border-radius: 12px;
-        padding: 12px;
-        background: #111318;
+        border-radius: 14px;
+        padding: 14px;
+        background: rgba(30,30,30,0.8);
         text-align:center;
         box-shadow: 0 6px 22px rgba(0,0,0,0.6);
         margin-bottom: 16px;
+        font-size: 16px;
     }
     .alert-box {
-        border-radius: 18px;
-        padding: 26px;
+        border-radius: 25px;
+        padding: 40px;
         text-align:center;
-        font-weight:700;
-        font-size:22px;
-        box-shadow: 0 8px 30px rgba(255,0,0,0.12);
+        font-weight:800;
+        font-size:28px;
+        color:#ff4b4b;
+        animation: blink 1s infinite;
+        background: linear-gradient(135deg, #400000, #ff1a1a);
+        box-shadow: 0px 0px 50px rgba(255, 20, 20, 0.5);
+    }
+    @keyframes blink {
+        0% { opacity: 1; transform: scale(1.02);}
+        50% { opacity: 0.7; transform: scale(1.07);}
+        100% { opacity: 1; transform: scale(1.02);}
     }
     .ok-box {
-        border-radius: 18px;
-        padding: 26px;
+        border-radius: 22px;
+        padding: 36px;
         text-align:center;
         font-weight:700;
-        font-size:22px;
-        box-shadow: 0 8px 30px rgba(0,255,120,0.06);
+        font-size:26px;
+        color:#88ffb7;
+        background: linear-gradient(135deg, #0f3d22, #00b86b);
+        box-shadow: 0px 0px 40px rgba(0,255,120,0.2);
+    }
+    .footer {
+        text-align:center;
+        margin-top:30px;
+        font-size:13px;
+        color:#666;
     }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='title'>🔥 Sistema IoT — Detección de Humo (ESP32 + MQ-7)</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Interfaz en tiempo real — con notificación por WhatsApp</div>", unsafe_allow_html=True)
+# =======================
+# TÍTULO Y ENCABEZADO
+# =======================
+st.markdown("<div class='title'>🔥 Sistema IoT — Detector de Humo</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>ESP32 + Sensor MQ-7 + Notificación por WhatsApp</div>", unsafe_allow_html=True)
 st.divider()
 
 # =======================
@@ -71,37 +108,30 @@ except Exception as e:
 st.divider()
 
 # =======================
-# VARIABLES DE SESIÓN
+# SESIÓN Y CONFIGURACIÓN
 # =======================
 if "alert_active" not in st.session_state:
     st.session_state.alert_active = False
-if "alert_resolved" not in st.session_state:
-    st.session_state.alert_resolved = False
 if "whatsapp_sent" not in st.session_state:
     st.session_state.whatsapp_sent = False
 
-# Configuración lateral
 refresh_rate = st.sidebar.slider("Intervalo de actualización (s)", 2, 10, 5)
 
 # =======================
 # CONFIGURACIÓN TWILIO
 # =======================
-ACCOUNT_SID = "AC8d93fa0d9e45de116e1c0e2dcf0009cb"  # ⚠️ Tu SID real
-AUTH_TOKEN = "3ee2f9f361f5d71ffbd180161962eb85"      # ⚠️ Tu Token real
-TO_NUMBER = "whatsapp:+573205639118"                # ⚠️ Tu número (con prefijo)
-FROM_NUMBER = "whatsapp:+14155238886"               # Número de Twilio sandbox
+ACCOUNT_SID = "AC8d93fa0d9e45de116e1c0e2dcf0009cb"
+AUTH_TOKEN = "3ee2f9f361f5d71ffbd180161962eb85"
+TO_NUMBER = "whatsapp:+573205639118"
+FROM_NUMBER = "whatsapp:+14155238886"
 
-# =======================
-# FUNCIONES AUXILIARES
-# =======================
 def enviar_mensaje_whatsapp():
-    """Envía mensaje de alerta por WhatsApp."""
     try:
         client = Client(ACCOUNT_SID, AUTH_TOKEN)
         message = client.messages.create(
             from_=FROM_NUMBER,
             to=TO_NUMBER,
-            body="🚨 ALERTA DE HUMO DETECTADA ⚠️\nEl sistema IoT ha detectado humo. Revisa la zona inmediatamente."
+            body="🚨 *ALERTA DE HUMO DETECTADA*\n\nEl sistema IoT ha detectado humo en el área.\nPor favor, verifica la zona inmediatamente."
         )
         st.session_state.whatsapp_sent = True
         st.success("📲 Mensaje de alerta enviado por WhatsApp.")
@@ -109,6 +139,9 @@ def enviar_mensaje_whatsapp():
     except Exception as e:
         st.error(f"❌ Error al enviar mensaje: {e}")
 
+# =======================
+# OBTENER DATOS DEL SERVIDOR
+# =======================
 def obtener_ultimo_estado():
     try:
         resp = requests.get(SERVER_URL, timeout=6)
@@ -121,7 +154,7 @@ def obtener_ultimo_estado():
         return None
 
 # =======================
-# ACTUALIZACIÓN Y LÓGICA
+# LÓGICA PRINCIPAL
 # =======================
 data = obtener_ultimo_estado()
 if data is None:
@@ -133,9 +166,8 @@ humo = int(data.get("humo_detectado", 0))
 
 if humo == 1:
     st.session_state.alert_active = True
-    st.markdown("<div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>🚨 HUMO DETECTADO</div>", unsafe_allow_html=True)
-    
-    # Enviar mensaje si aún no se envió
+    st.markdown("<div class='alert-box'>🚨 ¡PELIGRO! HUMO DETECTADO</div>", unsafe_allow_html=True)
+
     if not st.session_state.whatsapp_sent:
         enviar_mensaje_whatsapp()
 else:
@@ -145,5 +177,10 @@ else:
 
 time.sleep(refresh_rate)
 st.rerun()
+
+# =======================
+# FOOTER
+# =======================
+st.markdown("<div class='footer'>Desarrollado por Juan Pablo Pedraza Contreras — Universidad Santo Tomás</div>", unsafe_allow_html=True)
 
 
