@@ -50,7 +50,7 @@ st.divider()
 # ==============================
 # 🌍 CONFIGURACIÓN DEL SERVIDOR
 # ==============================
-URL_BASE = "https://serverfire-1.onrender.com"
+URL_BASE = "http://10.16.169.215:5000"
 
 st.subheader("📡 Estado de conexión con el servidor")
 
