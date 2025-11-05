@@ -119,7 +119,6 @@ st.subheader("📈 Lectura Actual del Sensor de Gas")
 placeholder = st.empty()
 refresh_rate = st.slider("⏱️ Intervalo de actualización (segundos)", 2, 10, 4)
 
-st.info("El sistema muestra el último valor detectado y lo limpia automáticamente.")
 
 # ==============================
 # 🔁 BUCLE PRINCIPAL
