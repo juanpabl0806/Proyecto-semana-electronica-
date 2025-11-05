@@ -4,3 +4,5 @@ gtts
 requests
 python-dotenv
 streamlit-lottie
+pip install twilio
+pip install streamlit streamlit-lottie twilio requests pandas
