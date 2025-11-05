@@ -4,7 +4,7 @@ import requests
 import time
 
 # URL de tu servidor en Render
-SERVER_URL = "https://serverfire-1.onrender.com/lecturas"
+SERVER_URL = "https://serverfire-1.onrender.com/ultimos"
 
 st.set_page_config(page_title="Panel IoT ESP32", page_icon="🌡️", layout="wide")
 
