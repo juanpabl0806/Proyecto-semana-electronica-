@@ -1,104 +1,112 @@
 import streamlit as st
-import pandas as pd
 import requests
+import pandas as pd
 import time
-from twilio.rest import Client
 from streamlit_lottie import st_lottie
 
-# ----------------- CONFIGURACIÓN GENERAL -----------------
-st.set_page_config(page_title="Sistema IoT de Gas", page_icon="🧪", layout="wide")
+# ==============================
+# 🔥 CONFIGURACIÓN INICIAL
+# ==============================
+st.set_page_config(
+    page_title="Sistema de Alerta IoT",
+    page_icon="🔥",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# ----------------- FUNCIÓN PARA ANIMACIÓN -----------------
-def load_lottie_url(url):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-alert_animation = load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_x62chJ.json")
-ok_animation = load_lottie_url("https://assets10.lottiefiles.com/packages/lf20_lk80fpsm.json")
-
-# ----------------- FUNCIÓN PARA ENVIAR WHATSAPP -----------------
-def enviar_alerta_whatsapp(mensaje):
+# ==============================
+# 🎨 FUNCIÓN PARA CARGAR LOTTIE
+# ==============================
+def load_lottieurl(url: str):
     try:
-        # 🔐 Ingresa tus credenciales de Twilio aquí
-        account_sid = 'AC8d93fa0d9e45de116e1c0e2dcf0009cb'
-        auth_token = '60257ba9848f7fadfe41022c35b66495'
-        client = Client(account_sid, auth_token)
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except:
+        return None
 
-        from_whatsapp = 'whatsapp:+14155238886',  
-        to_whatsapp = 'whatsapp:+573205639118'  
+# ==============================
+# 🌈 ENCABEZADO Y DISEÑO
+# ==============================
+col1, col2 = st.columns([1, 2])
 
-        client.messages.create(body=mensaje, from_=from_whatsapp, to=to_whatsapp)
-        st.success("Alerta enviada correctamente por WhatsApp.")
-    except Exception as e:
-        st.error(f"Error al enviar alerta de WhatsApp: {e}")
+with col1:
+    lottie = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_tfb3estd.json")
+    if lottie:
+        st_lottie(lottie, height=200, key="alerta")
 
-# ----------------- INTERFAZ PRINCIPAL -----------------
-st.markdown("<h1 style='text-align:center;color:#ff4b5c;'>🧪 Sistema de Prevencion de Incendios</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#ccc;'>Monitoreo en tiempo real del nivel de gas con alerta automática.</p>", unsafe_allow_html=True)
-st.markdown("---")
+with col2:
+    st.markdown(
+        """
+        <h1 style='font-size: 42px; color: #ff4b4b;'>Sistema de Alerta Temprana IoT 🔥</h1>
+        <p style='font-size: 18px; color: #555;'>Monitoreo en tiempo real de gases inflamables con ESP32 y servidor Flask en Render</p>
+        """,
+        unsafe_allow_html=True
+    )
 
-# ----------------- LECTURA DE DATOS -----------------
+st.divider()
+
+# ==============================
+# 🌍 CONFIGURACIÓN DEL SERVIDOR
+# ==============================
+URL_BASE = "https://serverfire-1.onrender.com"
+
+st.subheader("📡 Estado de conexión con el servidor")
+
 try:
-    response = requests.get("http://10.17.130.119:5000")  
-    data = response.json()
-    df = pd.DataFrame(data)
-
-    gas_actual = df["gas"].iloc[-1]
-
-    # Mostrar métrica y gráfico
-    st.metric("Nivel de Gas", f"{gas_actual:.1f} ppm")
-    st.line_chart(df[["gas"]])
-
-    # ----------------- DETECCIÓN DE ALERTA -----------------
-    if gas_actual > 400:
-        st_lottie(alert_animation, height=200, key="alert")
-        st.error("🚨 ¡Nivel de gas peligroso detectado!")
-
-        st.markdown("### ⚠️ Confirma la alerta en 30 segundos o se notificará automáticamente por WhatsApp.")
-
-        # Variables de sesión
-        if "alert_active" not in st.session_state:
-            st.session_state.alert_active = True
-            st.session_state.start_time = time.time()
-            st.session_state.alert_resolved = False
-            st.session_state.alert_sent = False
-
-        # Botones
-        colA, colB = st.columns(2)
-        with colA:
-            if st.button("📞 Llamar a urgencias ahora"):
-                st.session_state.alert_resolved = True
-                enviar_alerta_whatsapp(f"🚨 Alerta IoT: alto nivel de gas detectado ({gas_actual:.1f} ppm).")
-                st.success("📡 Se ha notificado a los servicios de emergencia.")
-        with colB:
-            if st.button("✅ Cancelar alerta (falsa alarma)"):
-                st.session_state.alert_resolved = True
-                st.info("🟢 Alerta cancelada manualmente.")
-
-        # Temporizador de 30 segundos
-        elapsed = time.time() - st.session_state.start_time
-        remaining = int(30 - elapsed)
-
-        if not st.session_state.alert_resolved:
-            if remaining > 0:
-                st.warning(f"Tiempo restante para confirmar: **{remaining} segundos**")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.session_state.alert_resolved = True
-                if not st.session_state.alert_sent:
-                    enviar_alerta_whatsapp(f"🚨 ALERTA AUTOMÁTICA IoT: No hubo respuesta. Nivel de gas: {gas_actual:.1f} ppm.")
-                    st.session_state.alert_sent = True
-                st.error("🚨 No hubo respuesta. Se ha notificado automáticamente a urgencias por WhatsApp.")
-
+    resp = requests.get(f"{URL_BASE}/lecturas", timeout=5)
+    if resp.status_code == 200:
+        st.success("✅ Conectado correctamente con el servidor Render")
     else:
-        st_lottie(ok_animation, height=200, key="ok")
-        st.success("✅ Nivel de gas estable.")
-        st.session_state.alert_active = False
-        st.session_state.alert_resolved = False
-        st.session_state.alert_sent = False
-
+        st.warning("⚠️ Servidor accesible, pero no devolvió datos válidos")
 except Exception as e:
-    st.error(f"⚠️ Error al conectar con el servidor Flask.\n\nDetalles: {e}")
+    st.error(f"❌ Error al conectar con el servidor: {e}")
+
+st.divider()
+
+# ==============================
+# 📊 MONITOREO EN TIEMPO REAL
+# ==============================
+st.subheader("📈 Monitoreo en tiempo real de lecturas del sensor de gas")
+
+placeholder = st.empty()
+
+refresh_rate = st.slider("⏱️ Intervalo de actualización (segundos)", 2, 20, 5)
+
+st.info("El sistema actualizará los datos automáticamente según el intervalo seleccionado.")
+
+# Bucle de actualización en tiempo real
+while True:
+    try:
+        resp = requests.get(f"{URL_BASE}/lecturas", timeout=5)
+        if resp.status_code == 200:
+            lecturas = resp.json()
+            
+            if isinstance(lecturas, list) and len(lecturas) > 0:
+                df = pd.DataFrame(lecturas)
+                
+                # Normalizar nombres de columnas esperadas
+                if "gas" in df.columns:
+                    df = df.rename(columns={"gas": "Nivel de Gas (ppm)"})
+                if "tiempo" in df.columns:
+                    df = df.rename(columns={"tiempo": "Tiempo"})
+                
+                with placeholder.container():
+                    st.line_chart(df.set_index(df.columns[0]))
+                    ultima = df.iloc[-1]
+                    st.metric(label="Último nivel detectado (ppm)", value=ultima.iloc[1])
+                    
+                    if ultima.iloc[1] > 400:
+                        st.error("🚨 Nivel peligroso de gas detectado. Activar protocolo de seguridad.")
+                    else:
+                        st.success("✅ Nivel seguro de gas detectado.")
+            else:
+                st.warning("⚠️ No hay lecturas disponibles aún.")
+        else:
+            st.error("❌ No se pudo obtener datos del servidor.")
+    except Exception as e:
+        st.error(f"Error al obtener lecturas: {e}")
+    
+    time.sleep(refresh_rate)
+
