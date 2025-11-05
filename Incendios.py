@@ -41,7 +41,7 @@ st.markdown("---")
 
 # ----------------- LECTURA DE DATOS -----------------
 try:
-    response = requests.get("http://10.16.20.252:5000")  
+    response = requests.get("http://10.17.130.119:5000")  
     data = response.json()
     df = pd.DataFrame(data)
 
