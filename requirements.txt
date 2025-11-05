@@ -1,8 +1,8 @@
 streamlit==1.37.1
-streamlit
-gtts
-requests
-python-dotenv
 streamlit-lottie
-pip install twilio
-pip install streamlit streamlit-lottie twilio requests pandas
+twilio
+requests
+pandas
+gtts
+python-dotenv
+rich<14
