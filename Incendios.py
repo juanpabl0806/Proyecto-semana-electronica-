@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import time
 import os
+from twilio.rest import Client  # 👈 Importar Twilio
 
 # =======================
 # CONFIGURACIÓN DE PÁGINA
@@ -48,7 +49,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='title'>🔥 Sistema IoT — Detección de Humo (ESP32 + MQ-7)</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Interfaz en tiempo real — estado actual del sensor de humo</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Interfaz en tiempo real — con notificación por WhatsApp</div>", unsafe_allow_html=True)
 st.divider()
 
 # =======================
@@ -76,13 +77,38 @@ if "alert_active" not in st.session_state:
     st.session_state.alert_active = False
 if "alert_resolved" not in st.session_state:
     st.session_state.alert_resolved = False
+if "whatsapp_sent" not in st.session_state:
+    st.session_state.whatsapp_sent = False
 
 # Configuración lateral
 refresh_rate = st.sidebar.slider("Intervalo de actualización (s)", 2, 10, 5)
 
 # =======================
+# CONFIGURACIÓN TWILIO
+# =======================
+ACCOUNT_SID = "AC8d93fa0d9e45de116e1c0e2dcf0009cb"  # ⚠️ Tu SID real
+AUTH_TOKEN = "3ee2f9f361f5d71ffbd180161962eb85"      # ⚠️ Tu Token real
+TO_NUMBER = "whatsapp:+573205639118"                # ⚠️ Tu número (con prefijo)
+FROM_NUMBER = "whatsapp:+14155238886"               # Número de Twilio sandbox
+
+# =======================
 # FUNCIONES AUXILIARES
 # =======================
+def enviar_mensaje_whatsapp():
+    """Envía mensaje de alerta por WhatsApp."""
+    try:
+        client = Client(ACCOUNT_SID, AUTH_TOKEN)
+        message = client.messages.create(
+            from_=FROM_NUMBER,
+            to=TO_NUMBER,
+            body="🚨 ALERTA DE HUMO DETECTADA ⚠️\nEl sistema IoT ha detectado humo. Revisa la zona inmediatamente."
+        )
+        st.session_state.whatsapp_sent = True
+        st.success("📲 Mensaje de alerta enviado por WhatsApp.")
+        print(f"Mensaje enviado con SID: {message.sid}")
+    except Exception as e:
+        st.error(f"❌ Error al enviar mensaje: {e}")
+
 def obtener_ultimo_estado():
     try:
         resp = requests.get(SERVER_URL, timeout=6)
@@ -94,68 +120,29 @@ def obtener_ultimo_estado():
     except:
         return None
 
-def activar_alerta_manual():
-    st.session_state.alert_resolved = True
-    st.session_state.alert_active = False
-    st.success("🚨 Alerta confirmada manualmente (simulación).")
-
-def cancelar_alerta():
-    st.session_state.alert_resolved = True
-    st.session_state.alert_active = False
-    st.success("✅ Alerta cancelada.")
-
 # =======================
-# ACTUALIZACIÓN DE DATOS
+# ACTUALIZACIÓN Y LÓGICA
 # =======================
 data = obtener_ultimo_estado()
 if data is None:
     st.markdown("<div class='status-box'>Esperando lecturas del sensor...</div>", unsafe_allow_html=True)
-    st.stop()
+    time.sleep(refresh_rate)
+    st.rerun()
 
-# =======================
-# LÓGICA PRINCIPAL
-# =======================
 humo = int(data.get("humo_detectado", 0))
 
-if humo == 1 and not st.session_state.alert_active:
+if humo == 1:
     st.session_state.alert_active = True
-    st.session_state.alert_resolved = False
-
-if humo == 0:
-    st.markdown("<div class='ok-box'>✅ Aire limpio y seguro</div>", unsafe_allow_html=True)
+    st.markdown("<div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>🚨 HUMO DETECTADO</div>", unsafe_allow_html=True)
+    
+    # Enviar mensaje si aún no se envió
+    if not st.session_state.whatsapp_sent:
+        enviar_mensaje_whatsapp()
+else:
     st.session_state.alert_active = False
-    st.session_state.alert_resolved = False
-    time.sleep(refresh_rate)
-    st.rerun()
+    st.session_state.whatsapp_sent = False
+    st.markdown("<div class='ok-box'>✅ Aire limpio y seguro</div>", unsafe_allow_html=True)
 
-# Mostrar alerta activa
-if st.session_state.alert_active and not st.session_state.alert_resolved:
-    st.markdown("""
-        <div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>
-            🚨 <span style='color:#ff4b4b;'>HUMO DETECTADO</span><br>
-            <div style='font-size:16px; color:#ffd6d6; margin-top:8px;'>
-                Se ha detectado presencia de humo en el ambiente.
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("📞 Llamar a emergencias (confirmar)", key="confirm_btn"):
-            activar_alerta_manual()
-            st.rerun()
-    with c2:
-        if st.button("✅ Cancelar alerta", key="cancel_btn"):
-            cancelar_alerta()
-            st.rerun()
-
-elif st.session_state.alert_resolved:
-    st.markdown("<div class='status-box' style='color:#7fffbf;'>ℹ️ Alerta resuelta manualmente</div>", unsafe_allow_html=True)
-    time.sleep(refresh_rate)
-    st.session_state.alert_resolved = False
-    st.rerun()
-
-# Refresco automático
 time.sleep(refresh_rate)
 st.rerun()
 
