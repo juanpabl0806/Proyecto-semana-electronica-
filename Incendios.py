@@ -117,12 +117,13 @@ def activar_alerta_automatica():
 # =======================
 # ACTUALIZACIÓN AUTOMÁTICA
 # =======================
-st_autorefresh = st.experimental_rerun
+# Reemplazamos la función experimental por la estable
+st_autorefresh = st.rerun
 
 data = obtener_ultimo_estado()
 if data is None:
     st.markdown("<div class='status-box'>Esperando lecturas del sensor...</div>", unsafe_allow_html=True)
-    st.experimental_rerun()
+    st.rerun()
 
 # =======================
 # LÓGICA PRINCIPAL
@@ -142,7 +143,7 @@ if humo == 0:
     st.session_state.alert_active = False
     st.session_state.alert_resolved = False
     time.sleep(refresh_rate)
-    st.experimental_rerun()
+    st.rerun()
 
 # Mostrar alerta activa
 if st.session_state.alert_active and not st.session_state.alert_resolved:
@@ -150,7 +151,7 @@ if st.session_state.alert_active and not st.session_state.alert_resolved:
     remaining = confirm_seconds - elapsed
     if remaining <= 0:
         activar_alerta_automatica()
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown(f"""
         <div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>
@@ -165,11 +166,11 @@ if st.session_state.alert_active and not st.session_state.alert_resolved:
     with c1:
         if st.button("📞 Llamar a emergencias (confirmar)", key="confirm_btn"):
             activar_alerta_manual()
-            st.experimental_rerun()
+            st.rerun()
     with c2:
         if st.button("✅ Cancelar alerta", key="cancel_btn"):
             cancelar_alerta()
-            st.experimental_rerun()
+            st.rerun()
 
 # Mostrar resultado de alerta resuelta
 elif st.session_state.alert_resolved:
@@ -179,9 +180,10 @@ elif st.session_state.alert_resolved:
         st.markdown("<div class='status-box' style='color:#7fffbf;'>ℹ️ Alerta resuelta manualmente</div>", unsafe_allow_html=True)
     time.sleep(refresh_rate)
     st.session_state.alert_resolved = False
-    st.experimental_rerun()
+    st.rerun()
 
 # Refresco automático
 time.sleep(refresh_rate)
-st.experimental_rerun()
+st.rerun()
+
 
