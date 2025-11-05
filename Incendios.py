@@ -44,13 +44,11 @@ st.markdown("""
         font-size:22px;
         box-shadow: 0 8px 30px rgba(0,255,120,0.06);
     }
-    .muted { color:#9aa4ad; font-size:13px; text-align:center; }
-    .small-btn { padding:8px 14px; border-radius:10px; font-weight:600; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='title'>🔥 Sistema IoT — Detección de Humo (ESP32 + MQ-7)</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Interfaz en tiempo real — solo estado de humo. Temporizador de confirmación incluido.</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Interfaz en tiempo real — solo estado de humo. Actualización automática.</div>", unsafe_allow_html=True)
 st.divider()
 
 # =======================
@@ -72,149 +70,118 @@ except Exception as e:
 st.divider()
 
 # =======================
-# ESTADO Y PLACEHOLDERS
+# VARIABLES DE SESIÓN
 # =======================
-placeholder = st.empty()
-controls = st.empty()
-
-# Sesión para almacenar estado de la alerta y temporizador
 if "alert_active" not in st.session_state:
-    st.session_state.alert_active = False        # True cuando hay detección en curso
+    st.session_state.alert_active = False
 if "start_time" not in st.session_state:
     st.session_state.start_time = None
 if "alert_resolved" not in st.session_state:
-    st.session_state.alert_resolved = False     # True si cancelado o confirmado
+    st.session_state.alert_resolved = False
 if "alert_auto_triggered" not in st.session_state:
     st.session_state.alert_auto_triggered = False
 
-# Umbral lógico: si el servidor envía 1 => humo detectado
-# Intervalo de actualización (segundos) y tiempo de confirmación (segundos)
-refresh_rate = st.sidebar.slider("Intervalo de actualización (s)", min_value=2, max_value=10, value=4)
-confirm_seconds = st.sidebar.number_input("Segundos para confirmación automática", min_value=5, max_value=120, value=30)
-
-st.sidebar.markdown("**Notas:**\n- Si aparece humo, tendrás botones para cancelar o confirmar.\n- Si no actúas en el tiempo, se activa la alerta automática (visual).")
+# Configuración lateral
+refresh_rate = st.sidebar.slider("Intervalo de actualización (s)", 2, 10, 5)
+confirm_seconds = st.sidebar.number_input("Segundos para confirmación automática", 5, 120, 30)
 
 # =======================
 # FUNCIONES AUXILIARES
 # =======================
 def obtener_ultimo_estado():
-    """Devuelve el último JSON desde SERVER_URL o None"""
     try:
         resp = requests.get(SERVER_URL, timeout=6)
         if resp.status_code == 200:
             data = resp.json()
             if isinstance(data, list) and len(data) > 0:
-                last = data[-1]
-                return last
+                return data[-1]
         return None
-    except Exception:
+    except:
         return None
 
 def activar_alerta_manual():
     st.session_state.alert_resolved = True
     st.session_state.alert_active = False
-    st.session_state.alert_auto_triggered = False
-    # Placeholder: aquí luego conectarás Twilio u otro servicio.
-    st.info("Se confirmó alerta (acción manual). — *No se envió WhatsApp en esta versión*")
+    st.success("🚨 Alerta confirmada manualmente (simulación).")
 
 def cancelar_alerta():
     st.session_state.alert_resolved = True
     st.session_state.alert_active = False
-    st.session_state.alert_auto_triggered = False
-    st.session_state.start_time = None
-    st.success("Alerta cancelada manualmente.")
+    st.success("✅ Alerta cancelada.")
 
 def activar_alerta_automatica():
-    st.session_state.alert_auto_triggered = True
-    st.session_state.alert_active = False
     st.session_state.alert_resolved = True
-    st.warning("Alerta automática activada (visual). — *No se envía WhatsApp en esta versión*")
-    # Placeholder: aquí colocarás la llamada a la función que envía WhatsApp cuando lo habilites.
+    st.session_state.alert_active = False
+    st.warning("⚠️ Alerta automática activada (visual).")
 
 # =======================
-# BUCLE PRINCIPAL (actualiza, muestra y borra)
+# ACTUALIZACIÓN AUTOMÁTICA
 # =======================
-while True:
-    last = obtener_ultimo_estado()
-    if last is None:
-        with placeholder.container():
-            st.markdown("<div class='status-box'>Esperando lecturas del sensor...</div>", unsafe_allow_html=True)
-        time.sleep(refresh_rate)
-        continue
+st_autorefresh = st.experimental_rerun
 
-    # El servidor debe enviar {"humo_detectado": 0} o {"humo_detectado": 1} en cada lectura
-    humo = int(last.get("humo_detectado", 0))
+data = obtener_ultimo_estado()
+if data is None:
+    st.markdown("<div class='status-box'>Esperando lecturas del sensor...</div>", unsafe_allow_html=True)
+    st.experimental_rerun()
 
-    # Si detecta humo y no hay aviso en proceso: iniciar proceso de confirmación
-    if humo == 1 and not st.session_state.alert_active and not st.session_state.alert_resolved:
-        st.session_state.alert_active = True
-        st.session_state.start_time = time.time()
-        st.session_state.alert_resolved = False
-        st.session_state.alert_auto_triggered = False
+# =======================
+# LÓGICA PRINCIPAL
+# =======================
+humo = int(data.get("humo_detectado", 0))
+now = time.time()
 
-    # Si no hay humo: mostrar "todo ok" brevemente y resetear estados
-    if humo == 0:
-        with placeholder.container():
-            st.markdown("<div class='ok-box'>✅ Aire limpio y seguro</div>", unsafe_allow_html=True)
-        # reset
-        st.session_state.alert_active = False
-        st.session_state.start_time = None
-        st.session_state.alert_resolved = False
-        st.session_state.alert_auto_triggered = False
-        time.sleep(refresh_rate)
-        placeholder.empty()
-        continue
+# Detección de humo
+if humo == 1 and not st.session_state.alert_active:
+    st.session_state.alert_active = True
+    st.session_state.start_time = now
+    st.session_state.alert_resolved = False
+    st.session_state.alert_auto_triggered = False
 
-    # Si llegamos aquí, humo == 1 (detected)
-    if st.session_state.alert_active and not st.session_state.alert_resolved:
-        elapsed = int(time.time() - st.session_state.start_time)
-        remaining = confirm_seconds - elapsed
-        if remaining < 0:
-            remaining = 0
-
-        # Mostrar cuadro de alerta + contador + botones
-        with placeholder.container():
-            st.markdown(f"""
-                <div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>
-                    🚨 <span style='color:#ff4b4b;'>HUMO DETECTADO</span><br>
-                    <div style='font-size:16px; color:#ffd6d6; margin-top:8px;'>Si no cancelas, se activará la alerta automática en <strong>{remaining}s</strong></div>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # Botones en la misma línea
-            c1, c2 = controls.columns([1,1])
-            with c1:
-                if st.button("📞 Llamar a emergencias (confirmar)"):
-                    activar_alerta_manual()
-            with c2:
-                if st.button("✅ Cancelar alerta"):
-                    cancelar_alerta()
-
-        # Si el tiempo llegó a 0 y no se resolvió, activar alerta automática (visual only)
-        if remaining <= 0 and not st.session_state.alert_resolved:
-            activar_alerta_automatica()
-
-        # esperar y repetir (el placeholder se vacía antes de la siguiente iteración)
-        time.sleep(1)
-        placeholder.empty()
-        controls.empty()
-        continue
-
-    # Si hubo una alerta ya resuelta (manual o automática), mostramos un mensaje breve
-    if st.session_state.alert_resolved:
-        with placeholder.container():
-            if st.session_state.alert_auto_triggered:
-                st.markdown("<div class='status-box' style='color:#ffd27f;'>⚠️ Alerta automática activada (visual)</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='status-box' style='color:#7fffbf;'>ℹ️ Alerta resuelta manualmente</div>", unsafe_allow_html=True)
-        time.sleep(refresh_rate)
-        placeholder.empty()
-        # luego permitimos que el sistema vuelva a detectar nuevas lecturas
-        st.session_state.alert_resolved = False
-        st.session_state.alert_auto_triggered = False
-        st.session_state.start_time = None
-        continue
-
-    # Espera mínima para no sobrecargar la UI
+if humo == 0:
+    st.markdown("<div class='ok-box'>✅ Aire limpio y seguro</div>", unsafe_allow_html=True)
+    st.session_state.alert_active = False
+    st.session_state.alert_resolved = False
     time.sleep(refresh_rate)
+    st.experimental_rerun()
+
+# Mostrar alerta activa
+if st.session_state.alert_active and not st.session_state.alert_resolved:
+    elapsed = int(now - st.session_state.start_time)
+    remaining = confirm_seconds - elapsed
+    if remaining <= 0:
+        activar_alerta_automatica()
+        st.experimental_rerun()
+
+    st.markdown(f"""
+        <div class='alert-box' style='background:#2b0000; border:2px solid #ff4b4b;'>
+            🚨 <span style='color:#ff4b4b;'>HUMO DETECTADO</span><br>
+            <div style='font-size:16px; color:#ffd6d6; margin-top:8px;'>
+                Si no cancelas, se activará la alerta automática en <strong>{remaining}s</strong>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("📞 Llamar a emergencias (confirmar)", key="confirm_btn"):
+            activar_alerta_manual()
+            st.experimental_rerun()
+    with c2:
+        if st.button("✅ Cancelar alerta", key="cancel_btn"):
+            cancelar_alerta()
+            st.experimental_rerun()
+
+# Mostrar resultado de alerta resuelta
+elif st.session_state.alert_resolved:
+    if st.session_state.alert_auto_triggered:
+        st.markdown("<div class='status-box' style='color:#ffd27f;'>⚠️ Alerta automática activada</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='status-box' style='color:#7fffbf;'>ℹ️ Alerta resuelta manualmente</div>", unsafe_allow_html=True)
+    time.sleep(refresh_rate)
+    st.session_state.alert_resolved = False
+    st.experimental_rerun()
+
+# Refresco automático
+time.sleep(refresh_rate)
+st.experimental_rerun()
 
